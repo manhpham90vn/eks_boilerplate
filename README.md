@@ -33,6 +33,7 @@ kubectl get all -n front-end
 ```shell
 kubectl get pod -n front-end
 kubectl get po -n front-end
+kubectl get po -n front-end -w
 ```
 
 ### Replicaset
@@ -66,7 +67,7 @@ kubectl get hpa -n front-end
 ### Top
 
 ```shell
-kubectl top pod -n front-end
+kubectl top pod -n front-end -w
 kubectl top node
 ```
 
