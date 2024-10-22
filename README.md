@@ -131,6 +131,7 @@ kubectl get rs -n front-end
 ```shell
 kubectl get service -n front-end
 kubectl get svc -n front-end
+kubectl delete service boilerplate-service -n front-end
 ```
 
 ### Deployment
@@ -138,6 +139,7 @@ kubectl get svc -n front-end
 ```shell
 kubectl get deployment -n front-end
 kubectl get deploy -n front-end
+kubectl delete deployment boilerplate-deployment -n front-end
 ```
 
 ### Autoscale
@@ -145,6 +147,12 @@ kubectl get deploy -n front-end
 ```shell
 kubectl get horizontalpodautoscalers -n front-end
 kubectl get hpa -n front-end
+```
+
+### Ingress
+
+```shell
+kubectl delete ingress frontend-ingress -n front-end
 ```
 
 ### Top
