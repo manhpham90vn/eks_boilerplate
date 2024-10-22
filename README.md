@@ -104,6 +104,12 @@ kubectl get ns
 kubectl get all -n front-end
 ```
 
+### Info
+
+```shell
+kubectl describe pod/boilerplate-deployment-9f4c9dfcc-w5qpm -n front-end
+```
+
 ### Pod
 
 ```shell

@@ -1,1 +1,1 @@
-iam_user = "manh"
+iam_user_arn = "arn:aws:iam::047590809543:user/manh"

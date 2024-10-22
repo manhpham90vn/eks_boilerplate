@@ -25,8 +25,8 @@ spec:
           image: manhpv151090/dockerize_expressjs:v2
           resources:
             limits:
-              cpu: "1"
-              memory: "2048Mi"
+              cpu: "0.5"
+              memory: "512Mi"
             requests:
               cpu: "0.25"
               memory: "256Mi"
@@ -39,6 +39,22 @@ spec:
           ports:
             - containerPort: 8080
               protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
   replicas: 2
   selector:
     matchLabels:
@@ -54,11 +70,33 @@ spec:
   selector:
     app: boilerplate
     tier: fe
-  type: NodePort
+  type: ClusterIP
   ports:
-    - port: 8080
+    - port: 80
       targetPort: 8080
-      nodePort: 30000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: front-end
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/target-type: "ip"
+spec:
+  rules:
+    - host: manhdev.click
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: boilerplate-service
+                port:
+                  number: 80
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -71,7 +109,7 @@ spec:
     kind: Deployment
     name: boilerplate-deployment
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
