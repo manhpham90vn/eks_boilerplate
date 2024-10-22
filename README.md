@@ -117,6 +117,7 @@ kubectl get pod -n front-end
 kubectl get po -n front-end
 kubectl get po -n front-end -w
 kubectl get pod -n argocd
+kubectl get po -n kube-system
 ```
 
 ### Replicaset
@@ -139,6 +140,7 @@ kubectl delete service boilerplate-service -n front-end
 ```shell
 kubectl get deployment -n front-end
 kubectl get deploy -n front-end
+kubectl get deployment metrics-server -n kube-system
 kubectl delete deployment boilerplate-deployment -n front-end
 ```
 
@@ -152,6 +154,7 @@ kubectl get hpa -n front-end
 ### Ingress
 
 ```shell
+kubectl get ingress -n front-end
 kubectl delete ingress frontend-ingress -n front-end
 ```
 
