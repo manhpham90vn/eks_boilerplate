@@ -1,6 +1,50 @@
 # EKS
 
-## Command Kubectl
+## Minikube
+
+### Reset
+
+```shell
+minikube stop && minikube delete && minikube start --cpus=2 --memory=2048mb
+```
+
+### Addons
+
+```shell
+minikube addons enable metrics-server
+```
+
+### Get service url
+
+```shell
+minikube service boilerplate-service -n front-end --url
+```
+
+## Setup
+
+```shell
+kubectl apply -f fe/template.yaml
+```
+
+```shell
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -f argocd/template.yaml
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
+```
+
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+## Load test
+
+```shell
+kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://boilerplate-service.front-end.svc.cluster.local:8080; done"
+```
+
+## Kubectl
 
 ### Cluster Info
 
@@ -34,6 +78,7 @@ kubectl get all -n front-end
 kubectl get pod -n front-end
 kubectl get po -n front-end
 kubectl get po -n front-end -w
+kubectl get pod -n argocd
 ```
 
 ### Replicaset
@@ -67,32 +112,6 @@ kubectl get hpa -n front-end
 ### Top
 
 ```shell
-kubectl top pod -n front-end -w
+kubectl top pod -n front-end
 kubectl top node
-```
-
-## Command Minikube
-
-### Get service url
-
-```shell
-minikube service boilerplate-service -n front-end --url
-```
-
-### Start
-
-```shell
-minikube start --cpus=2 --memory=2048mb
-```
-
-### Stop
-
-```shell
-minikube stop && minikube delete
-```
-
-### Addons
-
-```shell
-minikube addons enable metrics-server
 ```
