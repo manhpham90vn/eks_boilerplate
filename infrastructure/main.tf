@@ -14,6 +14,10 @@ provider "aws" {
 
 data "aws_availability_zones" "availability_zones" {}
 
+data "aws_iam_user" "iam_user" {
+  user_name = var.iam_user
+}
+
 locals {
   azs = slice(data.aws_availability_zones.availability_zones.names, 0, 3)
   vpc_cidr = "10.0.0.0/16"
@@ -229,6 +233,26 @@ resource "aws_eks_cluster" "eks" {
   role_arn = aws_iam_role.eks_role.arn
 }
 
+resource "aws_eks_addon" "cni" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "vpc-cni"
+}
+
+resource "aws_eks_addon" "core_dns" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "coredns"
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name   = "kube-proxy"
+}
+
+resource "aws_eks_addon" "pod_identity_webhook" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name = "eks-pod-identity-webhook"
+}
+
 resource "aws_iam_role" "eks_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -243,6 +267,47 @@ resource "aws_iam_role" "eks_role" {
       }
     ]
   })
+}
+
+resource "aws_iam_policy" "eks_access_policy" {
+  name        = "EKSAccessPolicy"
+  description = "Policy to allow access to EKS resources"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster",
+          "eks:ListClusters",
+          "eks:ListNodegroups",
+          "eks:DescribeNodegroup",
+          "eks:ListFargateProfiles",
+          "eks:DescribeFargateProfile",
+          "eks:ListUpdates",
+          "eks:DescribeUpdate",
+          "eks:CreateNodegroup",
+          "eks:DeleteNodegroup",
+          "eks:UpdateNodegroupConfig",
+          "eks:UpdateClusterConfig"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "user_eks_policy" {
+  user       = var.iam_user
+  policy_arn = aws_iam_policy.eks_access_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "eks_policy_attachment" {
@@ -278,5 +343,21 @@ resource "aws_eks_fargate_profile" "fargate_profile" {
 
   selector {
     namespace = "default"
+  }
+}
+
+resource "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+
+  data = {
+    mapUsers = <<YAML
+- userarn: arn:aws:iam::${aws_iam_user.iam_user.arn}:user/${var.iam_user}
+  username: your-iam-username
+  groups:
+    - system:masters
+YAML
   }
 }
