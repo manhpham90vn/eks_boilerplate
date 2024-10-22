@@ -38,6 +38,38 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.pas
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
+## AWS CLI
+
+```shell
+aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
+```
+
+## Terraform
+
+### Terraform init
+
+```shell
+terraform init
+```
+
+### Terraform show changes
+
+```shell
+terraform plan -var-file="terraform.tfvars"
+```
+
+### Terraform apply env production
+
+```shell
+terraform apply -var-file="terraform.tfvars" -auto-approve
+```
+
+### Terraform destroy
+
+```shell
+terraform destroy -var-file="terraform.tfvars" -auto-approve
+```
+
 ## Load test
 
 ```shell
