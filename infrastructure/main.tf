@@ -17,8 +17,8 @@ data "aws_availability_zones" "availability_zones" {}
 locals {
   azs = slice(data.aws_availability_zones.availability_zones.names, 0, 3)
   vpc_cidr = "10.0.0.0/16"
-  cidr_block_public = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
   cidr_block_private = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
+  cidr_block_public = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
   vpc_name = "My VPC"
   public_subnet_name = "Public Subnet"
   private_subnet_name = "Private Subnet"
@@ -30,6 +30,7 @@ locals {
   nat_gateway_name = "NAT Gateway"
   eks_name = "EKS_Cluster"
   fargate_profile_name = "Fargate_Profile"
+  node_group_name = "EKS_Node_Group"
 }
 
 resource "aws_vpc" "vpc" {
@@ -48,7 +49,7 @@ resource "aws_subnet" "private_subnet" {
   availability_zone = local.azs[count.index]
 
   tags = {
-    Name = "${local.public_subnet_name}-${count.index}"
+    Name = "${local.private_subnet_name}-${count.index}"
   }
 }
 
@@ -238,10 +239,6 @@ resource "aws_eks_addon" "cni" {
 resource "aws_eks_addon" "core_dns" {
   cluster_name = aws_eks_cluster.eks.name
   addon_name   = "coredns"
-
-  depends_on = [ 
-    aws_eks_fargate_profile.fargate_profile
-  ]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
@@ -275,13 +272,32 @@ resource "aws_iam_role_policy_attachment" "eks_policy_attachment" {
   role       = aws_iam_role.eks_role.name
 }
 
-resource "aws_iam_role" "fargate_pod_execution_role" {
+resource "aws_eks_node_group" "eks_node_group" {
+  cluster_name    = aws_eks_cluster.eks.name
+  node_group_name = local.node_group_name
+  node_role_arn   = aws_iam_role.ec2_node_role.arn
+  subnet_ids      = [for subnet in aws_subnet.private_subnet : subnet.id]
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 1
+    min_size     = 1
+  }
+
+  capacity_type = "ON_DEMAND"
+  instance_types = ["t3.medium"]
+  ami_type = "AL2023_x86_64_STANDARD"
+  disk_size = 20
+}
+
+resource "aws_iam_role" "ec2_node_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
+    Statement = [
+      {
         Action = "sts:AssumeRole"
         Principal = {
-          Service = "eks-fargate-pods.amazonaws.com"
+          Service = "ec2.amazonaws.com"
         }
         Effect = "Allow"
         Sid    = ""
@@ -290,35 +306,19 @@ resource "aws_iam_role" "fargate_pod_execution_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "fargate_policy_attachment" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
-  role       = aws_iam_role.fargate_pod_execution_role.name
+resource "aws_iam_role_policy_attachment" "node_policy_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.ec2_node_role.name
 }
 
-resource "aws_eks_fargate_profile" "fargate_profile" {
-  cluster_name = aws_eks_cluster.eks.name
-  fargate_profile_name = local.fargate_profile_name
-  pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
-  subnet_ids = [for subnet in aws_subnet.private_subnet : subnet.id]
+resource "aws_iam_role_policy_attachment" "cni_policy_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.ec2_node_role.name
+}
 
-  selector {
-    namespace = "default"
-  }
-
-  selector {
-    namespace = "kube-system"
-    labels = {
-      "k8s-app" = "kube-dns"
-    }
-  }
-
-  selector {
-    namespace = "front-end"
-  }
-
-  selector {
-    namespace = "argocd"
-  }
+resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.ec2_node_role.name
 }
 
 resource "aws_eks_access_entry" "access_entry" {

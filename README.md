@@ -20,7 +20,44 @@ minikube addons enable metrics-server
 minikube service boilerplate-service -n front-end --url
 ```
 
-## Setup
+## Terraform
+
+### Terraform init
+
+```shell
+terraform -chdir=infrastructure init
+```
+
+### Terraform show changes
+
+```shell
+terraform -chdir=infrastructure plan -var-file="terraform.tfvars"
+```
+
+### Terraform apply env production
+
+```shell
+terraform -chdir=infrastructure apply -var-file="terraform.tfvars" -auto-approve
+```
+
+### Terraform destroy
+
+```shell
+terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-approve
+terraform -chdir=infrastructure destroy -target=aws_eks_addon.core_dns -var-file="terraform.tfvars" -auto-approve
+```
+
+## Kubectl Apply
+
+```shell
+aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
+```
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-namespace.yaml &&\
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-service.yaml &&\
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-deployment.yaml
+```
 
 ```shell
 kubectl apply -f fe/template.yaml
@@ -38,44 +75,6 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.pas
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
-## AWS CLI
-
-```shell
-aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
-```
-
-## Terraform
-
-### Terraform init
-
-```shell
-terraform init
-```
-
-### Terraform show changes
-
-```shell
-terraform plan -var-file="terraform.tfvars"
-```
-
-### Terraform apply env production
-
-```shell
-terraform apply -var-file="terraform.tfvars" -auto-approve
-```
-
-### Terraform destroy
-
-```shell
-terraform destroy -var-file="terraform.tfvars" -auto-approve
-```
-
-## Load test
-
-```shell
-kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://boilerplate-service.front-end.svc.cluster.local:8080; done"
-```
-
 ## Kubectl
 
 ### Cluster Info
@@ -87,59 +86,60 @@ kubectl cluster-info
 ### Node info
 
 ```shell
-kubectl get node
 kubectl get no
+kubectl get node
 ```
 
 ### Namespace
 
 ```shell
-kubectl get namespace
 kubectl get ns
+kubectl get namespace
 ```
 
 ### All
 
 ```shell
+kubectl get all -n kube-system
 kubectl get all -n front-end
 ```
 
 ### Info
 
 ```shell
-kubectl describe pod/boilerplate-deployment-9f4c9dfcc-w5qpm -n front-end
+kubectl describe pod/coredns-878d47785-h45sn -n kube-system
 ```
 
 ### Pod
 
 ```shell
-kubectl get pod -n front-end
 kubectl get po -n front-end
 kubectl get po -n front-end -w
 kubectl get pod -n argocd
 kubectl get po -n kube-system
+kubectl get pod -n front-end
 ```
 
 ### Replicaset
 
 ```shell
-kubectl get replicaset -n front-end
 kubectl get rs -n front-end
+kubectl get replicaset -n front-end
 ```
 
 ### Service
 
 ```shell
-kubectl get service -n front-end
 kubectl get svc -n front-end
+kubectl get service -n front-end
 kubectl delete service boilerplate-service -n front-end
 ```
 
 ### Deployment
 
 ```shell
-kubectl get deployment -n front-end
 kubectl get deploy -n front-end
+kubectl get deployment -n front-end
 kubectl get deployment metrics-server -n kube-system
 kubectl delete deployment boilerplate-deployment -n front-end
 ```
@@ -147,8 +147,8 @@ kubectl delete deployment boilerplate-deployment -n front-end
 ### Autoscale
 
 ```shell
-kubectl get horizontalpodautoscalers -n front-end
 kubectl get hpa -n front-end
+kubectl get horizontalpodautoscalers -n front-end
 ```
 
 ### Ingress
@@ -163,4 +163,10 @@ kubectl delete ingress frontend-ingress -n front-end
 ```shell
 kubectl top pod -n front-end
 kubectl top node
+```
+
+### Test
+
+```shell
+hey -z 1m -c 5 -disable-keepalive https://google.com
 ```
