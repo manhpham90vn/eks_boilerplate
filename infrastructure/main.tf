@@ -28,7 +28,7 @@ locals {
   public_security_groups_name = "Public Security Group"
   private_security_groups_name = "Private Security Group"
   nat_gateway_name = "NAT Gateway"
-  eks_name = "EKS_Cluster"
+  eks_name = "boilerplateCluster"
   fargate_profile_name = "Fargate_Profile"
   node_group_name = "EKS_Node_Group"
 }
@@ -38,7 +38,8 @@ resource "aws_vpc" "vpc" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "${local.vpc_name}"
+    Name = "${local.vpc_name}",
+    "kubernetes.io/cluster/${local.eks_name}" = "owned"
   }
 }
 
@@ -50,6 +51,8 @@ resource "aws_subnet" "private_subnet" {
 
   tags = {
     Name = "${local.private_subnet_name}-${count.index}"
+    "kubernetes.io/role/internal-elb" = "1"
+    "kubernetes.io/cluster/${local.eks_name}" = "shared"
   }
 }
 
@@ -61,6 +64,8 @@ resource "aws_subnet" "public_subnet" {
 
   tags = {
     Name = "${local.public_subnet_name}-${count.index}"
+    "kubernetes.io/role/elb" = "1"
+    "kubernetes.io/cluster/${local.eks_name}" = "shared"
   }
 }
 
@@ -252,6 +257,7 @@ resource "aws_eks_addon" "pod_identity_webhook" {
 }
 
 resource "aws_iam_role" "eks_role" {
+  name = "IAMRoleForEKS"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -291,6 +297,7 @@ resource "aws_eks_node_group" "eks_node_group" {
 }
 
 resource "aws_iam_role" "ec2_node_role" {
+  name = "IAMRoleForEC2NodeEKS"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -306,21 +313,6 @@ resource "aws_iam_role" "ec2_node_role" {
   })
 }
 
-data "http" "iam_policy" {
-  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/install/iam_policy.json"
-}
-
-resource "aws_iam_policy" "alb_controller_policy" {
-  name        = "ALB-Controller-Policy"
-  description = "Policy for AWS Load Balancer Controller"
-  policy      = data.http.iam_policy.body
-}
-
-resource "aws_iam_role_policy_attachment" "attach_alb_controller_policy" {
-  role       = aws_iam_role.ec2_node_role.name
-  policy_arn = aws_iam_policy.alb_controller_policy.arn
-}
-
 resource "aws_iam_role_policy_attachment" "node_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.ec2_node_role.name
@@ -334,6 +326,16 @@ resource "aws_iam_role_policy_attachment" "cni_policy_attachment" {
 resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.ec2_node_role.name
+}
+
+data "http" "iam_policy" {
+  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/install/iam_policy.json"
+}
+
+resource "aws_iam_policy" "load_balancer_policy" {
+  name        = "PolicyForAWSLoadBalancerController"
+  description = "Policy for AWS Load Balancer Controller"
+  policy      = data.http.iam_policy.response_body
 }
 
 resource "aws_eks_access_entry" "access_entry" {

@@ -34,7 +34,7 @@ terraform -chdir=infrastructure init
 terraform -chdir=infrastructure plan -var-file="terraform.tfvars"
 ```
 
-### Terraform apply env production
+### Terraform apply
 
 ```shell
 terraform -chdir=infrastructure apply -var-file="terraform.tfvars" -auto-approve
@@ -48,27 +48,67 @@ terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-appro
 
 ## Kubectl Apply
 
+- update kubectl config
+
 ```shell
-aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
+aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 ```
 
-- install metrics-server
+- enable iam oidc provider and iamserviceaccount
 
 ```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+eksctl utils associate-iam-oidc-provider \
+    --region ap-southeast-1 \
+    --cluster boilerplateCluster \
+    --approve
+
+eksctl create iamserviceaccount \
+    --cluster=boilerplateCluster \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=arn:aws:iam::047590809543:policy/PolicyForAWSLoadBalancerController \
+    --override-existing-serviceaccounts \
+    --region ap-southeast-1 \
+    --approve
+
+aws ec2 modify-instance-metadata-options \
+    --http-put-response-hop-limit 2 \
+    --http-tokens required \
+    --region ap-southeast-1 \
+    --instance-id i-0bb559897c11f90ac
+```
+
+- install metrics server
+
+```shell
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm install metrics-server metrics-server/metrics-server -n kube-system
+helm uninstall metrics-server -n kube-system
+```
+
+- install cert manager
+
+```shell
+helm repo add jetstack https://charts.jetstack.io
+helm install cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --set installCRDs=true
+helm uninstall cert-manager --namespace cert-manager
 ```
 
 - install load balancer controller
 
 ```shell
-eksctl utils associate-iam-oidc-provider \
-    --region ap-southeast-1 \
-    --cluster EKS_Cluster \
-    --approve
-kubectl apply --validate=false -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.3/cert-manager.yaml
-wget -O /tmp/v2_9_0_full.yaml https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.9.0/v2_9_0_full.yaml
-sed -i 's/your-cluster-name/EKS_Cluster/g' /tmp/v2_9_0_full.yaml
-kubectl apply -f /tmp/v2_9_0_full.yaml
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    --set clusterName=boilerplateCluster \
+    --namespace kube-system \
+    --set serviceAccount.create=false \
+    --set serviceAccount.name=aws-load-balancer-controller \
+    --set region=ap-southeast-1 \
+    --set vpcId=vpc-0a79b2a9c626f86cf
+helm uninstall aws-load-balancer-controller --namespace kube-system
 ```
 
 - apply app front-end
@@ -80,8 +120,10 @@ kubectl apply -f fe/template.yaml
 - install argocd
 
 ```shell
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+helm repo add argo https://argoproj.github.io/argo-helm
+helm install argo-cd argo/argo-cd \
+    --namespace argocd \
+    --create-namespace
 kubectl apply -f argocd/template.yaml
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
@@ -166,8 +208,8 @@ kubectl get horizontalpodautoscalers -n front-end
 ### Ingress
 
 ```shell
-kubectl get ingress -n front-end
-kubectl delete ingress frontend-ingress -n front-end
+kubectl get ingresses -n front-end
+kubectl delete ing frontend-ingress -n front-end
 ```
 
 ### Top
@@ -175,6 +217,15 @@ kubectl delete ingress frontend-ingress -n front-end
 ```shell
 kubectl top pod -n front-end
 kubectl top node
+```
+
+### Logs
+
+```shell
+kubectl get events -n kube-system
+kubectl -n kube-system logs deployment.apps/coredns
+kubectl -n kube-system logs deployment.apps/aws-load-balancer-controller
+kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balancer-controller
 ```
 
 ### Test
