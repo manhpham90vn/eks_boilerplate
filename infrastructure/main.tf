@@ -306,6 +306,21 @@ resource "aws_iam_role" "ec2_node_role" {
   })
 }
 
+data "http" "iam_policy" {
+  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/install/iam_policy.json"
+}
+
+resource "aws_iam_policy" "alb_controller_policy" {
+  name        = "ALB-Controller-Policy"
+  description = "Policy for AWS Load Balancer Controller"
+  policy      = data.http.iam_policy.body
+}
+
+resource "aws_iam_role_policy_attachment" "attach_alb_controller_policy" {
+  role       = aws_iam_role.ec2_node_role.name
+  policy_arn = aws_iam_policy.alb_controller_policy.arn
+}
+
 resource "aws_iam_role_policy_attachment" "node_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.ec2_node_role.name

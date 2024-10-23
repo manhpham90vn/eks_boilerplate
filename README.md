@@ -54,9 +54,14 @@ aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
 ```
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-namespace.yaml &&\
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-service.yaml &&\
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/examples/echoservice/echoserver-deployment.yaml
+eksctl utils associate-iam-oidc-provider \
+    --region ap-southeast-1 \
+    --cluster EKS_Cluster \
+    --approve
+kubectl apply --validate=false -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.3/cert-manager.yaml
+wget -O /tmp/v2_9_0_full.yaml https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.9.0/v2_9_0_full.yaml
+sed -i 's/your-cluster-name/EKS_Cluster/g' /tmp/v2_9_0_full.yaml
+kubectl apply -f /tmp/v2_9_0_full.yaml
 ```
 
 ```shell
