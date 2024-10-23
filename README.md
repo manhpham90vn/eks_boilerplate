@@ -44,7 +44,6 @@ terraform -chdir=infrastructure apply -var-file="terraform.tfvars" -auto-approve
 
 ```shell
 terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-approve
-terraform -chdir=infrastructure destroy -target=aws_eks_addon.core_dns -var-file="terraform.tfvars" -auto-approve
 ```
 
 ## Kubectl Apply
@@ -52,6 +51,14 @@ terraform -chdir=infrastructure destroy -target=aws_eks_addon.core_dns -var-file
 ```shell
 aws eks update-kubeconfig --region ap-southeast-1 --name EKS_Cluster
 ```
+
+- install metrics-server
+
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+- install load balancer controller
 
 ```shell
 eksctl utils associate-iam-oidc-provider \
@@ -64,9 +71,13 @@ sed -i 's/your-cluster-name/EKS_Cluster/g' /tmp/v2_9_0_full.yaml
 kubectl apply -f /tmp/v2_9_0_full.yaml
 ```
 
+- apply app front-end
+
 ```shell
 kubectl apply -f fe/template.yaml
 ```
+
+- install argocd
 
 ```shell
 kubectl create namespace argocd
@@ -74,10 +85,6 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 kubectl apply -f argocd/template.yaml
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
-```
-
-```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
 ## Kubectl
