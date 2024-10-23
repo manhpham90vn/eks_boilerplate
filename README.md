@@ -66,7 +66,7 @@ eksctl utils associate-iam-oidc-provider \
 eksctl delete iamserviceaccount \
     --cluster=boilerplateCluster \
     --namespace=kube-system \
-     --name=aws-load-balancer-controller
+    --name=aws-load-balancer-controller
 
 eksctl create iamserviceaccount \
     --cluster=boilerplateCluster \
