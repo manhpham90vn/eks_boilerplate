@@ -285,9 +285,9 @@ resource "aws_eks_node_group" "eks_node_group" {
   subnet_ids      = [for subnet in aws_subnet.private_subnet : subnet.id]
 
   scaling_config {
-    desired_size = 1
-    max_size     = 1
-    min_size     = 1
+    desired_size = 2
+    max_size     = 2
+    min_size     = 2
   }
 
   capacity_type = "ON_DEMAND"
