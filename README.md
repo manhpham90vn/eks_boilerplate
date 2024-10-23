@@ -231,5 +231,5 @@ kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balance
 ### Test
 
 ```shell
-hey -z 1m -c 5 -disable-keepalive https://google.com
+hey -z 1m -c 5 -disable-keepalive http://manhdev.click
 ```
