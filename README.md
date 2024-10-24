@@ -193,10 +193,9 @@ kubectl describe pod/coredns-878d47785-h45sn -n kube-system
 ### Pod
 
 ```shell
-kubectl get po -n front-end
-kubectl get po -n front-end -w
-kubectl get pod -n argocd
 kubectl get po -n kube-system
+kubectl get po -n front-end -o wide
+kubectl get po -n front-end -w
 kubectl get pod -n front-end
 ```
 
@@ -204,6 +203,7 @@ kubectl get pod -n front-end
 
 ```shell
 kubectl get rs -n front-end
+kubectl get rs -n front-end -o wide
 kubectl get replicaset -n front-end
 ```
 
@@ -237,6 +237,37 @@ kubectl get horizontalpodautoscalers -n front-end
 kubectl get ing -n front-end
 kubectl get ingresses -n front-end
 kubectl delete ing frontend-ingress -n front-end
+```
+
+### Configmap
+
+```shell
+kubectl get cm -n front-end -o yaml
+kubectl get configmap -n front-end
+```
+
+### Force deploy
+
+```shell
+kubectl rollout restart deployment boilerplate-deployment -n front-end
+```
+
+### Forward
+
+```shell
+kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
+```
+
+### Exec
+
+```shell
+kubectl exec -it boilerplate-deployment-5d79c6b64-6djjs -n front-end -- sh
+```
+
+### Check diff
+
+```shell
+kubectl diff -f fe/template.yaml
 ```
 
 ### Top

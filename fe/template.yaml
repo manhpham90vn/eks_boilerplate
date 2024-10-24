@@ -3,6 +3,15 @@ kind: Namespace
 metadata:
   name: front-end
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boilerplate-configmap
+  namespace: front-end
+data:
+  PORT: "8080"
+  NODE_ENV: production
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,9 +41,15 @@ spec:
               memory: "512Mi"
           env:
             - name: PORT
-              value: "8080"
+              valueFrom:
+                configMapKeyRef:
+                  name: boilerplate-configmap
+                  key: PORT
             - name: NODE_ENV
-              value: "production"
+              valueFrom:
+                configMapKeyRef:
+                  name: boilerplate-configmap
+                  key: NODE_ENV
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
