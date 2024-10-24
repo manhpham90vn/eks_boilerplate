@@ -13,6 +13,50 @@
 - [ ] Log collector (fluentd/Elasticsearch/Grafana)
 - [ ] Terraform remote state (S3)
 
+## Setup
+
+```shell
+# Install kubectl
+curl -LO https://dl.k8s.io/release/`curl -LS https://dl.k8s.io/release/stable.txt`/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
+# Install minikube
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \
+  && chmod +x minikube
+sudo mkdir -p /usr/local/bin/
+sudo install minikube /usr/local/bin/
+
+# Install terraform
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+
+# Install AWS Cli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Install eksctl
+ARCH=amd64
+PLATFORM=$(uname -s)_$ARCH
+curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$PLATFORM.tar.gz"
+tar -xzf eksctl_$PLATFORM.tar.gz -C /tmp && rm eksctl_$PLATFORM.tar.gz
+sudo mv /tmp/eksctl /usr/local/bin
+
+# Install helm
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+
+# Install hey
+wget -O /tmp/hey_linux_amd64 https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64
+chmod +x /tmp/hey_linux_amd64
+sudo mv /tmp/hey_linux_amd64 /usr/bin/
+```
+
 ## Minikube
 
 ### Reset
