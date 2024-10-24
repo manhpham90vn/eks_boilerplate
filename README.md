@@ -1,5 +1,14 @@
 # EKS
 
+## Todo
+
+- [ ] Convert to helm chart
+- [ ] Use argo rollouts for blue/green deployment
+- [ ] Encrypt secrets in yaml
+- [ ] Apply demo for front-end and api app
+- [ ] Apply HTTPS
+- [ ] Log collector (fluentd/Elasticsearch/Grafana)
+
 ## Minikube
 
 ### Reset
