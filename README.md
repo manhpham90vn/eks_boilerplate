@@ -2,7 +2,9 @@
 
 ## Todo
 
-- [ ] Convert to helm chart
+- [ ] Add ingress for argocd, prometheus, grafana
+- [ ] Limit IP access for argocd, prometheus, grafana endpoint
+- [ ] Convert front-end app to helm chart
 - [ ] Use argo rollouts for blue/green deployment
 - [ ] Encrypt secrets in yaml
 - [ ] Apply demo for front-end and api app
