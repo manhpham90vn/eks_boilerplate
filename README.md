@@ -18,6 +18,8 @@ minikube addons enable metrics-server
 
 ```shell
 minikube service boilerplate-service -n front-end --url
+minikube service prometheus-server-ext -n prometheus --url
+minikube service grafana-ext -n grafana --url
 ```
 
 ## Terraform
@@ -128,6 +130,23 @@ kubectl apply -f argocd/template.yaml
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 helm uninstall argo-cd --namespace argocd
+```
+
+- install prometheus
+
+```shell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/prometheus --namespace prometheus --create-namespace
+helm uninstall prometheus --namespace prometheus
+```
+
+- install grafana
+
+```shell
+helm repo add grafana https://grafana.github.io/helm-charts
+helm install grafana grafana/grafana --namespace grafana --create-namespace
+kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+helm uninstall grafana --namespace grafana
 ```
 
 ## Kubectl
