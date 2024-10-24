@@ -4,11 +4,12 @@
 
 - [ ] Improve security group, role, autoscaling
 - [ ] Add ingress for argocd, prometheus, grafana
+- [ ] Apply PV and PVC for argocd, prometheus, grafana
 - [ ] Limit IP access for argocd, prometheus, grafana endpoint
-- [ ] Encrypt secrets in yaml
 - [ ] Apply HTTPS
 - [ ] Convert front-end app to helm chart
-- [ ] Apply demo for front-end and api app (each app uses a different namespace)
+- [ ] Encrypt secrets in yaml
+- [ ] Apply demo for front-end and api app (each app uses a different namespace, config PV and PVC)
 - [ ] Use argo rollouts for blue/green deployment
 - [ ] Log collector (fluentd/Elasticsearch/Grafana)
 - [ ] Terraform remote state (S3)
