@@ -64,6 +64,12 @@ eksctl utils associate-iam-oidc-provider \
     --cluster boilerplateCluster \
     --approve
 
+# Delete exits iamserviceaccount
+eksctl delete iamserviceaccount \
+    --cluster=boilerplateCluster \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller
+
 eksctl create iamserviceaccount \
     --cluster=boilerplateCluster \
     --namespace=kube-system \
@@ -127,7 +133,7 @@ helm install argo-cd argo/argo-cd \
     --namespace argocd \
     --create-namespace
 kubectl apply -f argocd/template.yaml
-kubectl port-forward svc/argocd-server -n argocd 8080:443
+kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 helm uninstall argo-cd --namespace argocd
 ```
@@ -228,6 +234,7 @@ kubectl get horizontalpodautoscalers -n front-end
 ### Ingress
 
 ```shell
+kubectl get ing -n front-end
 kubectl get ingresses -n front-end
 kubectl delete ing frontend-ingress -n front-end
 ```
