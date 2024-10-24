@@ -10,6 +10,7 @@
 - [ ] Apply demo for front-end and api app
 - [ ] Apply HTTPS
 - [ ] Log collector (fluentd/Elasticsearch/Grafana)
+- [ ] Terraform remote state (S3)
 
 ## Minikube
 
