@@ -2,13 +2,14 @@
 
 ## Todo
 
+- [ ] Improve security group, role, autoscaling
 - [ ] Add ingress for argocd, prometheus, grafana
 - [ ] Limit IP access for argocd, prometheus, grafana endpoint
-- [ ] Convert front-end app to helm chart
-- [ ] Use argo rollouts for blue/green deployment
 - [ ] Encrypt secrets in yaml
-- [ ] Apply demo for front-end and api app
 - [ ] Apply HTTPS
+- [ ] Convert front-end app to helm chart
+- [ ] Apply demo for front-end and api app (each app uses a different namespace)
+- [ ] Use argo rollouts for blue/green deployment
 - [ ] Log collector (fluentd/Elasticsearch/Grafana)
 - [ ] Terraform remote state (S3)
 
