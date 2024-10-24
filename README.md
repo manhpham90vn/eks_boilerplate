@@ -114,13 +114,12 @@ terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-appro
 aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 ```
 
-- enable iam oidc provider and iamserviceaccount
+- check iamserviceaccount
 
 ```shell
-eksctl utils associate-iam-oidc-provider \
-    --region ap-southeast-1 \
-    --cluster boilerplateCluster \
-    --approve
+# List iamserviceaccount
+oidc_id=$(aws eks describe-cluster --name boilerplateCluster --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
+aws iam list-open-id-connect-providers | grep $oidc_id | cut -d "/" -f4
 
 # Delete exits iamserviceaccount
 eksctl delete iamserviceaccount \
@@ -128,6 +127,7 @@ eksctl delete iamserviceaccount \
     --namespace=kube-system \
     --name=aws-load-balancer-controller
 
+# Create iamserviceaccount for aws-load-balancer-controller
 eksctl create iamserviceaccount \
     --cluster=boilerplateCluster \
     --namespace=kube-system \
@@ -137,11 +137,15 @@ eksctl create iamserviceaccount \
     --region ap-southeast-1 \
     --approve
 
-aws ec2 modify-instance-metadata-options \
-    --http-put-response-hop-limit 2 \
-    --http-tokens required \
-    --region ap-southeast-1 \
-    --instance-id i-0bb559897c11f90ac
+# Create iamserviceaccount for ebs-csi-controller-sa
+eksctl create iamserviceaccount \
+        --cluster boilerplateCluster \
+        --namespace kube-system \
+        --name ebs-csi-controller-sa \
+        --override-existing-serviceaccounts \
+        --attach-policy-arn=arn:aws:iam::047590809543:policy/PolicyForAWSEBSCSIDriver \
+        --region ap-southeast-1 \
+        --approve
 ```
 
 - install metrics server
@@ -173,7 +177,7 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
     --set serviceAccount.create=false \
     --set serviceAccount.name=aws-load-balancer-controller \
     --set region=ap-southeast-1 \
-    --set vpcId=vpc-0a79b2a9c626f86cf
+    --set vpcId=vpc-0d99f4864a32315b8
 helm uninstall aws-load-balancer-controller --namespace kube-system
 ```
 
@@ -196,11 +200,30 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.pas
 helm uninstall argo-cd --namespace argocd
 ```
 
+- install ebs csi driver
+
+```shell
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+helm upgrade --install aws-ebs-csi-driver \
+  --namespace kube-system \
+  --set serviceAccount.controller.create=false \
+  --set serviceAccount.snapshot.create=false \
+  --set enableVolumeScheduling=true \
+  --set enableVolumeResizing=true \
+  --set enableVolumeSnapshot=true \
+  --set serviceAccount.snapshot.name=ebs-csi-controller-irsa \
+  --set serviceAccount.controller.name=ebs-csi-controller-irsa \
+  --force \
+  aws-ebs-csi-driver/aws-ebs-csi-driver
+helm uninstall aws-ebs-csi-driver --namespace kube-system
+```
+
 - install prometheus
 
 ```shell
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm install prometheus prometheus-community/prometheus --namespace prometheus --create-namespace
+kubectl port-forward service/prometheus-server -n prometheus 8081:80
 helm uninstall prometheus --namespace prometheus
 ```
 

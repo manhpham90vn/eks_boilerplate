@@ -278,6 +278,11 @@ resource "aws_iam_role_policy_attachment" "eks_policy_attachment" {
   role       = aws_iam_role.eks_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks_policy_attachment_sg_for_pod" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.eks_role.name
+}
+
 resource "aws_eks_node_group" "eks_node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = local.node_group_name
@@ -328,14 +333,56 @@ resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
   role       = aws_iam_role.ec2_node_role.name
 }
 
-data "http" "iam_policy" {
+data "tls_certificate" "certificate" {
+  url = aws_eks_cluster.eks.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "openid_connect_provider" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.certificate.certificates[0].sha1_fingerprint]
+  url             = data.tls_certificate.certificate.url
+}
+
+data "aws_iam_policy_document" "assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_iam_openid_connect_provider.openid_connect_provider.url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:aws-node"]
+    }
+
+    principals {
+      identifiers = [aws_iam_openid_connect_provider.openid_connect_provider.arn]
+      type        = "Federated"
+    }
+  }
+}
+
+resource "aws_iam_role" "iam_role_service_account" {
+  assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
+  name               = "RoleForServiceAccount"
+}
+
+data "http" "iam_policy_alb" {
   url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/install/iam_policy.json"
 }
 
 resource "aws_iam_policy" "load_balancer_policy" {
   name        = "PolicyForAWSLoadBalancerController"
   description = "Policy for AWS Load Balancer Controller"
-  policy      = data.http.iam_policy.response_body
+  policy      = data.http.iam_policy_alb.response_body
+}
+
+data "http" "iam_policy_ebs_csi" {
+  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/master/docs/example-iam-policy.json"
+}
+
+resource "aws_iam_policy" "ebs_csi_policy" {
+  name               = "PolicyForAWSEBSCSIDriver"
+  policy             = data.http.iam_policy_ebs_csi.response_body
 }
 
 resource "aws_eks_access_entry" "access_entry" {
