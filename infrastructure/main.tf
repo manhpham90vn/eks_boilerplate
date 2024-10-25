@@ -221,19 +221,27 @@ resource "aws_security_group" "private_security_group" {
 
 resource "aws_eks_cluster" "eks" {
   name = "${local.eks_name}"
+  role_arn = aws_iam_role.eks_role.arn
+  version = "1.30"
+
   upgrade_policy {
     support_type = "STANDARD"
   }
+
   access_config {
     authentication_mode = "API_AND_CONFIG_MAP"
   }
+
   vpc_config {
     subnet_ids = [for subnet in aws_subnet.public_subnet : subnet.id]
     endpoint_private_access = false
     endpoint_public_access = true
   }
-  role_arn = aws_iam_role.eks_role.arn
-  version = "1.30"
+  
+  depends_on = [ 
+    aws_iam_role_policy_attachment.eks_policy_attachment, 
+    aws_iam_role_policy_attachment.eks_policy_attachment_sg_for_pod 
+  ]
 }
 
 resource "aws_eks_addon" "cni" {
@@ -254,6 +262,11 @@ resource "aws_eks_addon" "kube_proxy" {
 resource "aws_eks_addon" "pod_identity_webhook" {
   cluster_name = aws_eks_cluster.eks.name
   addon_name = "eks-pod-identity-agent"
+}
+
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name = aws_eks_cluster.eks.name
+  addon_name = "aws-ebs-csi-driver"
 }
 
 resource "aws_iam_role" "eks_role" {
@@ -298,7 +311,14 @@ resource "aws_eks_node_group" "eks_node_group" {
   capacity_type = "ON_DEMAND"
   instance_types = ["t3.medium"]
   ami_type = "AL2023_x86_64_STANDARD"
-  disk_size = 20
+  disk_size = 100
+
+  depends_on = [ 
+    aws_iam_role_policy_attachment.node_policy_attachment, 
+    aws_iam_role_policy_attachment.cni_policy_attachment, 
+    aws_iam_role_policy_attachment.ecr_policy_attachment,
+    aws_iam_role_policy_attachment.ebs_csi_driver_policy_attachment
+  ]
 }
 
 resource "aws_iam_role" "ec2_node_role" {
@@ -333,6 +353,11 @@ resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
   role       = aws_iam_role.ec2_node_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver_policy_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ec2_node_role.name
+}
+
 data "tls_certificate" "certificate" {
   url = aws_eks_cluster.eks.identity[0].oidc[0].issuer
 }
@@ -343,29 +368,6 @@ resource "aws_iam_openid_connect_provider" "openid_connect_provider" {
   url             = data.tls_certificate.certificate.url
 }
 
-data "aws_iam_policy_document" "assume_role_policy" {
-  statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-    effect  = "Allow"
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(aws_iam_openid_connect_provider.openid_connect_provider.url, "https://", "")}:sub"
-      values   = ["system:serviceaccount:kube-system:aws-node"]
-    }
-
-    principals {
-      identifiers = [aws_iam_openid_connect_provider.openid_connect_provider.arn]
-      type        = "Federated"
-    }
-  }
-}
-
-resource "aws_iam_role" "iam_role_service_account" {
-  assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
-  name               = "RoleForServiceAccount"
-}
-
 data "http" "iam_policy_alb" {
   url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.9.0/docs/install/iam_policy.json"
 }
@@ -374,15 +376,6 @@ resource "aws_iam_policy" "load_balancer_policy" {
   name        = "PolicyForAWSLoadBalancerController"
   description = "Policy for AWS Load Balancer Controller"
   policy      = data.http.iam_policy_alb.response_body
-}
-
-data "http" "iam_policy_ebs_csi" {
-  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/master/docs/example-iam-policy.json"
-}
-
-resource "aws_iam_policy" "ebs_csi_policy" {
-  name               = "PolicyForAWSEBSCSIDriver"
-  policy             = data.http.iam_policy_ebs_csi.response_body
 }
 
 resource "aws_eks_access_entry" "access_entry" {
