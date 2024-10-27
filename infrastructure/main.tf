@@ -303,15 +303,15 @@ resource "aws_eks_node_group" "eks_node_group" {
   subnet_ids      = [for subnet in aws_subnet.private_subnet : subnet.id]
 
   scaling_config {
-    desired_size = 2
-    max_size     = 2
-    min_size     = 2
+    desired_size = 3
+    max_size     = 6
+    min_size     = 3
   }
 
   capacity_type = "ON_DEMAND"
   instance_types = ["t3.medium"]
   ami_type = "AL2023_x86_64_STANDARD"
-  disk_size = 100
+  disk_size = 20
 
   depends_on = [ 
     aws_iam_role_policy_attachment.node_policy_attachment, 

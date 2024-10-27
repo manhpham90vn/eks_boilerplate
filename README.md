@@ -117,9 +117,22 @@ aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 - check iamserviceaccount
 
 ```shell
-# Check oidc providers
-oidc_id=$(aws eks describe-cluster --name boilerplateCluster --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
-aws iam list-open-id-connect-providers | grep $oidc_id
+# Create iamserviceaccount for ebs-csi-controller-sa
+eksctl create iamserviceaccount \
+    --cluster boilerplateCluster \
+    --namespace kube-system \
+    --name ebs-csi-controller-sa \
+    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+    --override-existing-serviceaccounts \
+    --region ap-southeast-1 \
+    --approve
+
+# Delete iamserviceaccount for ebs-csi-controller-sa
+eksctl delete iamserviceaccount \
+    --cluster=boilerplateCluster \
+    --namespace=kube-system \
+    --name=ebs-csi-controller-sa
+
 
 # Create iamserviceaccount for aws-load-balancer-controller
 eksctl create iamserviceaccount \
@@ -127,16 +140,6 @@ eksctl create iamserviceaccount \
     --namespace=kube-system \
     --name=aws-load-balancer-controller \
     --attach-policy-arn=arn:aws:iam::047590809543:policy/PolicyForAWSLoadBalancerController \
-    --override-existing-serviceaccounts \
-    --region ap-southeast-1 \
-    --approve
-
-# Create iamserviceaccount for ebs-csi-controller-sa
-eksctl create iamserviceaccount \
-    --cluster boilerplateCluster \
-    --namespace kube-system \
-    --name ebs-csi-controller-sa \
-    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
     --override-existing-serviceaccounts \
     --region ap-southeast-1 \
     --approve
@@ -177,7 +180,7 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
     --set serviceAccount.create=false \
     --set serviceAccount.name=aws-load-balancer-controller \
     --set region=ap-southeast-1 \
-    --set vpcId=vpc-0ecdee4d9875b7de4
+    --set vpcId=vpc-0621cdd90086be670
 helm uninstall aws-load-balancer-controller --namespace kube-system
 ```
 
@@ -222,6 +225,7 @@ helm install grafana grafana/grafana \
     --create-namespace \
     --set persistence.enabled=true \
     --set persistence.storageClassName="gp2"
+kubectl port-forward service/grafana -n grafana 8082:80
 kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 helm uninstall grafana --namespace grafana
 ```
@@ -251,6 +255,7 @@ kubectl get namespace
 ### All
 
 ```shell
+kubectl get all -A
 kubectl get all -n kube-system
 kubectl get all -n front-end
 ```
@@ -258,7 +263,10 @@ kubectl get all -n front-end
 ### Info
 
 ```shell
+kubectl describe no ip-10-0-24-38.ap-southeast-1.compute.internal
 kubectl describe pod/coredns-878d47785-h45sn -n kube-system
+kubectl describe pvc storage-prometheus-alertmanager-0 -n prometheus
+kubectl get serviceaccount ebs-csi-controller-sa -n kube-system -o yaml
 ```
 
 ### Pod
@@ -320,8 +328,8 @@ kubectl get configmap -n front-end
 ### Persistent Volume
 
 ```shell
-kubectl -n prometheus get persistentvolumes
 kubectl -n prometheus get pv
+kubectl -n prometheus get persistentvolumes
 ```
 
 ### Persistent Volume Claim
@@ -343,6 +351,8 @@ kubectl get storageclass
 ```shell
 kubectl rollout restart deployment boilerplate-deployment -n front-end
 kubectl rollout restart deployment.apps/ebs-csi-controller -n kube-system
+kubectl rollout restart deployment.apps/prometheus-server -n prometheus
+kubectl rollout restart service/prometheus-alertmanager -n prometheus
 ```
 
 ### Forward
@@ -368,6 +378,13 @@ kubectl diff -f fe/template.yaml
 ```shell
 kubectl top pod -n front-end
 kubectl top node
+```
+
+### serviceaccounts
+
+```shell
+kubectl get sa -n kube-system
+kubectl get serviceaccounts -n kube-system
 ```
 
 ### Logs
