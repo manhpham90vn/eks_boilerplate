@@ -396,11 +396,12 @@ resource "aws_iam_role" "load_balaner_controller_role" {
       {
         Effect = "Allow"
         Principal = {
-          Service = "eks.amazonaws.com"
+          Federated = aws_iam_openid_connect_provider.openid_connect_provider.url
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
             "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
           }
         }
@@ -449,17 +450,17 @@ resource "aws_iam_role" "ebs_csi_controller_role" {
       {
         Effect = "Allow"
         Principal = {
-          Service = "eks.amazonaws.com"
+          Federated = aws_iam_openid_connect_provider.openid_connect_provider.url
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
             "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
           }
         }
       }
     ]
-    federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${aws_eks_cluster.eks.identity[0].oidc[0].issuer}"
   })
 }
 
