@@ -114,43 +114,6 @@ terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-appro
 aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 ```
 
-- check iamserviceaccount
-
-```shell
-# Create iamserviceaccount for ebs-csi-controller-sa
-eksctl create iamserviceaccount \
-    --cluster boilerplateCluster \
-    --namespace kube-system \
-    --name ebs-csi-controller-sa \
-    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
-    --override-existing-serviceaccounts \
-    --region ap-southeast-1 \
-    --approve
-
-# Delete iamserviceaccount for ebs-csi-controller-sa
-eksctl delete iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=ebs-csi-controller-sa
-
-
-# Create iamserviceaccount for aws-load-balancer-controller
-eksctl create iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller \
-    --attach-policy-arn=arn:aws:iam::047590809543:policy/PolicyForAWSLoadBalancerController \
-    --override-existing-serviceaccounts \
-    --region ap-southeast-1 \
-    --approve
-
-# Delete iamserviceaccount for aws-load-balancer-controller
-eksctl delete iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller
-```
-
 - install metrics server
 
 ```shell
@@ -180,7 +143,7 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
     --set serviceAccount.create=false \
     --set serviceAccount.name=aws-load-balancer-controller \
     --set region=ap-southeast-1 \
-    --set vpcId=vpc-0621cdd90086be670
+    --set vpcId=vpc-02378e46026151049
 helm uninstall aws-load-balancer-controller --namespace kube-system
 ```
 
@@ -267,6 +230,8 @@ kubectl describe no ip-10-0-24-38.ap-southeast-1.compute.internal
 kubectl describe pod/coredns-878d47785-h45sn -n kube-system
 kubectl describe pvc storage-prometheus-alertmanager-0 -n prometheus
 kubectl get serviceaccount ebs-csi-controller-sa -n kube-system -o yaml
+kubectl describe serviceaccounts ebs-csi-controller-sa -n kube-system
+kubectl describe serviceaccounts aws-load-balancer-controller -n kube-system
 ```
 
 ### Pod
@@ -378,6 +343,7 @@ kubectl diff -f fe/template.yaml
 ```shell
 kubectl top pod -n front-end
 kubectl top node
+kubectl get hpa boilerplate-hpa -n front-end --watch
 ```
 
 ### serviceaccounts
@@ -390,6 +356,8 @@ kubectl get serviceaccounts -n kube-system
 ### Logs
 
 ```shell
+kubectl get events -n prometheus
+kubectl get events -n front-end
 kubectl get events -n kube-system
 kubectl -n kube-system logs deployment.apps/coredns
 kubectl -n kube-system logs deployment.apps/aws-load-balancer-controller
@@ -399,7 +367,8 @@ kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balance
 ### Test
 
 ```shell
-hey -z 1m -c 5 -disable-keepalive http://manhdev.click
+hey -z 10m -c 100 -disable-keepalive http://manhdev.click
+kubectl run load-generator --image=williamyeh/hey:latest --restart=Never -- -z 10m -c 100 http://boilerplate-service.front-end.svc.cluster.local
 ```
 
 ### Helm
