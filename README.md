@@ -124,7 +124,7 @@ kubectl apply -f fe/template.yaml
 
 ```shell
 kubectl apply -f argocd/template.yaml
-kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
+kubectl port-forward service/argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 ```
 
@@ -132,8 +132,11 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.pas
 
 ```shell
 kubectl port-forward service/prometheus-server -n prometheus 8081:80
+http://
 helm uninstall prometheus --namespace prometheus
 ```
+
+- prometheus domain: [http://prometheus-server.prometheus.svc.cluster.local]
 
 - install grafana
 
@@ -142,6 +145,8 @@ kubectl port-forward service/grafana -n grafana 8082:80
 kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 helm uninstall grafana --namespace grafana
 ```
+
+- grafana dashboard id: 315
 
 ## Kubectl
 

@@ -247,8 +247,7 @@ resource "aws_eks_cluster" "eks" {
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.eks_policy_attachment,
-    aws_iam_role_policy_attachment.eks_policy_attachment_sg_for_pod
+    aws_iam_role.eks_role
   ]
 }
 
@@ -279,6 +278,11 @@ resource "aws_iam_role_policy_attachment" "eks_policy_attachment_sg_for_pod" {
   role       = aws_iam_role.eks_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks_policy_attachment_ec2_container_registry" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_role.name
+}
+
 resource "aws_eks_node_group" "eks_node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = local.node_group_name
@@ -300,7 +304,8 @@ resource "aws_eks_node_group" "eks_node_group" {
     aws_iam_role_policy_attachment.node_policy_attachment,
     aws_iam_role_policy_attachment.cni_policy_attachment,
     aws_iam_role_policy_attachment.ecr_policy_attachment,
-    aws_iam_role_policy_attachment.ebs_csi_driver_policy_attachment
+    aws_iam_role_policy_attachment.ebs_csi_driver_policy_attachment,
+    aws_iam_role_policy_attachment.ecr_container_builds_policy_attachment
   ]
 }
 
@@ -336,6 +341,11 @@ resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
   role       = aws_iam_role.ec2_node_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "ecr_container_builds_policy_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilderECRContainerBuilds"
+  role       = aws_iam_role.ec2_node_role.name
+}
+
 resource "aws_iam_role_policy_attachment" "ebs_csi_driver_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   role       = aws_iam_role.ec2_node_role.name
@@ -366,9 +376,14 @@ resource "aws_eks_addon" "pod_identity_webhook" {
 }
 
 resource "aws_eks_addon" "ebs_csi_driver" {
-  cluster_name = aws_eks_cluster.eks.name
-  addon_name   = "aws-ebs-csi-driver"
-  depends_on   = [aws_eks_cluster.eks, aws_eks_node_group.eks_node_group]
+  cluster_name             = aws_eks_cluster.eks.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi_controller_role.arn
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group,
+    aws_iam_role.ebs_csi_controller_role
+  ]
 }
 
 data "tls_certificate" "certificate" {
@@ -409,8 +424,8 @@ resource "aws_iam_role" "load_balaner_controller_role" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:aud" = "sts.amazonaws.com"
-            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
           }
         }
       }
@@ -460,8 +475,8 @@ resource "aws_iam_role" "ebs_csi_controller_role" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:aud" = "sts.amazonaws.com"
-            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
           }
         }
       }
