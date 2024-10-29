@@ -137,7 +137,7 @@ http://
 helm uninstall prometheus --namespace prometheus
 ```
 
-- prometheus domain: [http://prometheus-server.prometheus.svc.cluster.local]
+- prometheus domain: http://prometheus-server.prometheus.svc.cluster.local
 
 - install grafana
 
