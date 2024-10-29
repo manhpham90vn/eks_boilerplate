@@ -70,7 +70,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 2
-  replicas: 2
+  replicas: 4
   selector:
     matchLabels:
       app: boilerplate
@@ -128,8 +128,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: boilerplate-deployment
-  minReplicas: 2
-  maxReplicas: 8
+  minReplicas: 4
+  maxReplicas: 40
   metrics:
     - type: Resource
       resource:

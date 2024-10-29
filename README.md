@@ -114,76 +114,6 @@ terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-appro
 aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 ```
 
-- check iamserviceaccount
-
-```shell
-# Create iamserviceaccount for ebs-csi-controller-sa
-eksctl create iamserviceaccount \
-    --cluster boilerplateCluster \
-    --namespace kube-system \
-    --name ebs-csi-controller-sa \
-    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
-    --override-existing-serviceaccounts \
-    --region ap-southeast-1 \
-    --approve
-
-# Delete iamserviceaccount for ebs-csi-controller-sa
-eksctl delete iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=ebs-csi-controller-sa
-
-
-# Create iamserviceaccount for aws-load-balancer-controller
-eksctl create iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller \
-    --attach-policy-arn=arn:aws:iam::047590809543:policy/PolicyForAWSLoadBalancerController \
-    --override-existing-serviceaccounts \
-    --region ap-southeast-1 \
-    --approve
-
-# Delete iamserviceaccount for aws-load-balancer-controller
-eksctl delete iamserviceaccount \
-    --cluster=boilerplateCluster \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller
-```
-
-- install metrics server
-
-```shell
-helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-helm install metrics-server metrics-server/metrics-server -n kube-system
-helm uninstall metrics-server -n kube-system
-```
-
-- install cert manager
-
-```shell
-helm repo add jetstack https://charts.jetstack.io
-helm install cert-manager jetstack/cert-manager \
-    --namespace cert-manager \
-    --create-namespace \
-    --set installCRDs=true
-helm uninstall cert-manager --namespace cert-manager
-```
-
-- install load balancer controller
-
-```shell
-helm repo add eks https://aws.github.io/eks-charts
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-    --set clusterName=boilerplateCluster \
-    --namespace kube-system \
-    --set serviceAccount.create=false \
-    --set serviceAccount.name=aws-load-balancer-controller \
-    --set region=ap-southeast-1 \
-    --set vpcId=vpc-0621cdd90086be670
-helm uninstall aws-load-balancer-controller --namespace kube-system
-```
-
 - apply app front-end
 
 ```shell
@@ -193,25 +123,14 @@ kubectl apply -f fe/template.yaml
 - install argocd
 
 ```shell
-helm repo add argo https://argoproj.github.io/argo-helm
-helm install argo-cd argo/argo-cd \
-    --namespace argocd \
-    --create-namespace
 kubectl apply -f argocd/template.yaml
 kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
-helm uninstall argo-cd --namespace argocd
 ```
 
 - install prometheus
 
 ```shell
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/prometheus \
-    --namespace prometheus \
-    --create-namespace \
-    --set server.persistentVolume.storageClass="gp2" \
-    --set alertmanager.persistentVolume.storageClass="gp2"
 kubectl port-forward service/prometheus-server -n prometheus 8081:80
 helm uninstall prometheus --namespace prometheus
 ```
@@ -219,12 +138,6 @@ helm uninstall prometheus --namespace prometheus
 - install grafana
 
 ```shell
-helm repo add grafana https://grafana.github.io/helm-charts
-helm install grafana grafana/grafana \
-    --namespace grafana \
-    --create-namespace \
-    --set persistence.enabled=true \
-    --set persistence.storageClassName="gp2"
 kubectl port-forward service/grafana -n grafana 8082:80
 kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 helm uninstall grafana --namespace grafana
@@ -267,6 +180,8 @@ kubectl describe no ip-10-0-24-38.ap-southeast-1.compute.internal
 kubectl describe pod/coredns-878d47785-h45sn -n kube-system
 kubectl describe pvc storage-prometheus-alertmanager-0 -n prometheus
 kubectl get serviceaccount ebs-csi-controller-sa -n kube-system -o yaml
+kubectl describe serviceaccounts ebs-csi-controller-sa -n kube-system
+kubectl describe serviceaccounts aws-load-balancer-controller -n kube-system
 ```
 
 ### Pod
@@ -378,6 +293,7 @@ kubectl diff -f fe/template.yaml
 ```shell
 kubectl top pod -n front-end
 kubectl top node
+kubectl get hpa boilerplate-hpa -n front-end --watch
 ```
 
 ### serviceaccounts
@@ -390,6 +306,8 @@ kubectl get serviceaccounts -n kube-system
 ### Logs
 
 ```shell
+kubectl get events -n prometheus
+kubectl get events -n front-end
 kubectl get events -n kube-system
 kubectl -n kube-system logs deployment.apps/coredns
 kubectl -n kube-system logs deployment.apps/aws-load-balancer-controller
@@ -399,7 +317,8 @@ kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balance
 ### Test
 
 ```shell
-hey -z 1m -c 5 -disable-keepalive http://manhdev.click
+hey -z 10m -c 100 -disable-keepalive http://manhdev.click
+kubectl run load-generator --image=williamyeh/hey:latest --restart=Never -- -z 10m -c 100 http://boilerplate-service.front-end.svc.cluster.local
 ```
 
 ### Helm
