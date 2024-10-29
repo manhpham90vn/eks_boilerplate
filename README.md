@@ -133,7 +133,6 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.pas
 
 ```shell
 kubectl port-forward service/prometheus-server -n prometheus 8081:80
-http://
 helm uninstall prometheus --namespace prometheus
 ```
 
