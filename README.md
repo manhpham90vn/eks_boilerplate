@@ -114,39 +114,6 @@ terraform -chdir=infrastructure destroy -var-file="terraform.tfvars" -auto-appro
 aws eks update-kubeconfig --region ap-southeast-1 --name boilerplateCluster
 ```
 
-- install metrics server
-
-```shell
-helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-helm install metrics-server metrics-server/metrics-server -n kube-system
-helm uninstall metrics-server -n kube-system
-```
-
-- install cert manager
-
-```shell
-helm repo add jetstack https://charts.jetstack.io
-helm install cert-manager jetstack/cert-manager \
-    --namespace cert-manager \
-    --create-namespace \
-    --set installCRDs=true
-helm uninstall cert-manager --namespace cert-manager
-```
-
-- install load balancer controller
-
-```shell
-helm repo add eks https://aws.github.io/eks-charts
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-    --set clusterName=boilerplateCluster \
-    --namespace kube-system \
-    --set serviceAccount.create=false \
-    --set serviceAccount.name=aws-load-balancer-controller \
-    --set region=ap-southeast-1 \
-    --set vpcId=vpc-02378e46026151049
-helm uninstall aws-load-balancer-controller --namespace kube-system
-```
-
 - apply app front-end
 
 ```shell
@@ -156,25 +123,14 @@ kubectl apply -f fe/template.yaml
 - install argocd
 
 ```shell
-helm repo add argo https://argoproj.github.io/argo-helm
-helm install argo-cd argo/argo-cd \
-    --namespace argocd \
-    --create-namespace
 kubectl apply -f argocd/template.yaml
 kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
-helm uninstall argo-cd --namespace argocd
 ```
 
 - install prometheus
 
 ```shell
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/prometheus \
-    --namespace prometheus \
-    --create-namespace \
-    --set server.persistentVolume.storageClass="gp2" \
-    --set alertmanager.persistentVolume.storageClass="gp2"
 kubectl port-forward service/prometheus-server -n prometheus 8081:80
 helm uninstall prometheus --namespace prometheus
 ```
@@ -182,12 +138,6 @@ helm uninstall prometheus --namespace prometheus
 - install grafana
 
 ```shell
-helm repo add grafana https://grafana.github.io/helm-charts
-helm install grafana grafana/grafana \
-    --namespace grafana \
-    --create-namespace \
-    --set persistence.enabled=true \
-    --set persistence.storageClassName="gp2"
 kubectl port-forward service/grafana -n grafana 8082:80
 kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 helm uninstall grafana --namespace grafana

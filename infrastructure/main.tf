@@ -5,6 +5,14 @@ terraform {
       source  = "hashicorp/aws"
       version = ">=5.72.1"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">=2.33.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">=2.16.1"
+    }
   }
 }
 
@@ -396,13 +404,13 @@ resource "aws_iam_role" "load_balaner_controller_role" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.openid_connect_provider.url
+          Federated = aws_iam_openid_connect_provider.openid_connect_provider.arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
-            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:aud" = "sts.amazonaws.com"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
           }
         }
       }
@@ -432,15 +440,12 @@ resource "kubernetes_service_account" "alb_controller_sa" {
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.load_balaner_controller_role.arn
     }
-    labels = {
-      "app.kubernetes.io/name"       = "aws-load-balancer-controller"
-      "app.kubernetes.io/component"  = "controller"
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
   }
 }
 
 data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
 
 resource "aws_iam_role" "ebs_csi_controller_role" {
   name = "EBSCSIControllerRole"
@@ -450,13 +455,13 @@ resource "aws_iam_role" "ebs_csi_controller_role" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.openid_connect_provider.url
+          Federated = aws_iam_openid_connect_provider.openid_connect_provider.arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:aud" = "sts.amazonaws.com"
-            "${aws_iam_openid_connect_provider.openid_connect_provider.url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:aud" = "sts.amazonaws.com"
+            "${aws_iam_openid_connect_provider.openid_connect_provider.arn}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
           }
         }
       }
@@ -477,6 +482,151 @@ resource "kubernetes_service_account" "ebs_csi_controller_sa" {
       "eks.amazonaws.com/role-arn" = aws_iam_role.ebs_csi_controller_role.arn
     }
   }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = aws_eks_cluster.eks.endpoint
+    token                  = data.aws_eks_cluster_auth.eks_cluster_auth.token
+    cluster_ca_certificate = base64decode(aws_eks_cluster.eks.certificate_authority[0].data)
+  }
+}
+
+resource "helm_release" "metrics_server" {
+  name             = "metrics-server"
+  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart            = "metrics-server"
+  namespace        = "kube-system"
+  create_namespace = false
+  wait             = true
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group
+  ]
+}
+
+resource "helm_release" "cert_manager" {
+  name             = "cert-manager"
+  repository       = "https://charts.jetstack.io"
+  chart            = "cert-manager"
+  namespace        = "cert-manager"
+  create_namespace = true
+  wait             = true
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group
+  ]
+}
+
+resource "helm_release" "load_balaner_controller" {
+  name             = "aws-load-balancer-controller"
+  chart            = "aws-load-balancer-controller"
+  repository       = "https://aws.github.io/eks-charts"
+  namespace        = "kube-system"
+  create_namespace = false
+  wait             = true
+
+  set {
+    name  = "clusterName"
+    value = local.eks_name
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "false"
+  }
+
+  set {
+    name  = "serviceAccount.name"
+    value = "aws-load-balancer-controller"
+  }
+
+  set {
+    name  = "region"
+    value = data.aws_region.current.name
+  }
+
+  set {
+    name  = "vpcId"
+    value = aws_vpc.vpc.id
+  }
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group,
+    kubernetes_service_account.alb_controller_sa
+  ]
+}
+
+resource "helm_release" "argocd" {
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  namespace        = "argocd"
+  create_namespace = true
+  wait             = true
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group
+  ]
+}
+
+resource "helm_release" "prometheus" {
+  name             = "prometheus"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "prometheus"
+  namespace        = "prometheus"
+  create_namespace = true
+  wait             = true
+
+  set {
+    name  = "server.persistentVolume.storageClass"
+    value = "gp2"
+  }
+
+  set {
+    name  = "alertmanager.persistentVolume.storageClass"
+    value = "gp2"
+  }
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group,
+    kubernetes_service_account.ebs_csi_controller_sa
+  ]
+}
+
+resource "helm_release" "grafana" {
+  name             = "grafana"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "grafana"
+  namespace        = "grafana"
+  create_namespace = true
+  wait             = true
+
+  set {
+    name  = "persistence.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "persistence.storageClassName"
+    value = "gp2"
+  }
+
+  depends_on = [
+    aws_eks_cluster.eks,
+    aws_eks_node_group.eks_node_group,
+    kubernetes_service_account.ebs_csi_controller_sa
+  ]
 }
 
 resource "aws_eks_access_entry" "access_entry" {
