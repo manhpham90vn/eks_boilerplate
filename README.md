@@ -15,7 +15,7 @@
 - [ ] Log collector (fluentd/Elasticsearch/Grafana)
 - [ ] Terraform remote state (S3)
 
-## Setup
+## Prerequisites
 
 ```shell
 # Install kubectl
@@ -101,6 +101,18 @@ terraform -chdir=infrastructure plan -var-file="terraform.tfvars"
 terraform -chdir=infrastructure apply -var-file="terraform.tfvars" -auto-approve
 ```
 
+### Terraform list state
+
+```shell
+terraform -chdir=infrastructure state list
+```
+
+### Terraform delete state
+
+```shell
+terraform -chdir=infrastructure state rm test
+```
+
 ### Terraform destroy
 
 ```shell
@@ -136,7 +148,7 @@ kubectl port-forward service/prometheus-server -n prometheus 8081:80
 helm uninstall prometheus --namespace prometheus
 ```
 
-- prometheus domain: http://prometheus-server.prometheus.svc.cluster.local
+- prometheus domain: <http://prometheus-server.prometheus.svc.cluster.local>
 
 - install grafana
 
@@ -227,6 +239,7 @@ kubectl delete deployment boilerplate-deployment -n front-end
 
 ```shell
 kubectl get hpa -n front-end
+kubectl get hpa boilerplate-hpa -n front-end --watch
 kubectl get horizontalpodautoscalers -n front-end
 ```
 
@@ -278,7 +291,7 @@ kubectl rollout restart service/prometheus-alertmanager -n prometheus
 ### Forward
 
 ```shell
-kubectl port-forward service/argo-cd-argocd-server -n argocd 8080:443
+kubectl port-forward service/argocd-server -n argocd 8080:443
 ```
 
 ### Exec
@@ -298,7 +311,6 @@ kubectl diff -f fe/template.yaml
 ```shell
 kubectl top pod -n front-end
 kubectl top node
-kubectl get hpa boilerplate-hpa -n front-end --watch
 ```
 
 ### serviceaccounts
@@ -308,12 +320,17 @@ kubectl get sa -n kube-system
 kubectl get serviceaccounts -n kube-system
 ```
 
-### Logs
+### Events
 
 ```shell
 kubectl get events -n prometheus
 kubectl get events -n front-end
 kubectl get events -n kube-system
+```
+
+### Logs
+
+```shell
 kubectl -n kube-system logs deployment.apps/coredns
 kubectl -n kube-system logs deployment.apps/aws-load-balancer-controller
 kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balancer-controller
@@ -323,12 +340,17 @@ kubectl logs -n kube-system --tail -1 -l app.kubernetes.io/name=aws-load-balance
 
 ```shell
 hey -z 10m -c 100 -disable-keepalive http://manhdev.click
-kubectl run load-generator --image=williamyeh/hey:latest --restart=Never -- -z 10m -c 100 http://boilerplate-service.front-end.svc.cluster.local
+kubectl run load-generator \
+  --image=williamyeh/hey:latest \
+  --restart=Never -- \
+  -z 10m \
+  -c 100 http://boilerplate-service.front-end.svc.cluster.local
 ```
 
 ### Helm
 
 ```shell
+helm repo list
 helm get values prometheus -n prometheus
 helm show values prometheus-community/prometheus > result.yaml
 ```
