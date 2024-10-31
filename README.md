@@ -5,6 +5,8 @@
 - [ ] Improve security group, role, autoscaling
 - [ ] Add ingress for argocd, prometheus, grafana
 - [x] Apply PV and PVC for prometheus, grafana
+- [ ] Fix Grafana Dashboard empty metric (install node_exporter)
+- [ ] Fix Alert Manager can not provisioning pvc
 - [ ] Limit IP access for argocd, prometheus, grafana endpoint
 - [ ] Apply HTTPS
 - [ ] Convert front-end app to helm chart
